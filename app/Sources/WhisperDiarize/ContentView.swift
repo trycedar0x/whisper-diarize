@@ -41,6 +41,9 @@ struct ContentView: View {
                     }
                 }
                 if case .done = runner.state {
+                    Button { Task { await runner.reprocess() } } label: {
+                        Label("Force Reprocess", systemImage: "arrow.clockwise")
+                    }
                     Button {
                         runner.reset()
                     } label: {
@@ -48,6 +51,9 @@ struct ContentView: View {
                     }
                 }
                 if case .failed = runner.state {
+                    Button { Task { await runner.reprocess() } } label: {
+                        Label("Force Reprocess", systemImage: "arrow.clockwise")
+                    }
                     Button {
                         runner.reset()
                     } label: {

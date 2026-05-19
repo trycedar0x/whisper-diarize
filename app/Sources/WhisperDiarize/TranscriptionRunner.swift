@@ -17,11 +17,15 @@ final class TranscriptionRunner: ObservableObject {
     @Published var startTime: Date? = nil
 
     private var process: Process?
+    private(set) var lastAudioURL: URL?
+    private(set) var lastArgs: (hfToken: String, model: String, language: String,
+                                speakers: Int?, polish: Bool, polishModel: String)?
 
     // MARK: - Public API
 
     func transcribe(audioURL: URL, hfToken: String, model: String, language: String, speakers: Int?,
-                    polish: Bool = false, polishModel: String = "mlx-community/Qwen2.5-1.5B-Instruct-4bit") async {
+                    polish: Bool = false, polishModel: String = "mlx-community/Qwen2.5-1.5B-Instruct-4bit",
+                    force: Bool = false) async {
         state = .running(phase: "Preparing…")
         logLines = []
         transcript = []
@@ -29,6 +33,8 @@ final class TranscriptionRunner: ObservableObject {
         stepDetails = [:]
         stepProgress = [:]
         startTime = Date()
+        lastAudioURL = audioURL
+        lastArgs = (hfToken, model, language, speakers, polish, polishModel)
 
         guard let uvPath = findUV() else {
             state = .failed("uv not found.\nInstall it from https://docs.astral.sh/uv/ and relaunch the app.")
@@ -55,6 +61,7 @@ final class TranscriptionRunner: ObservableObject {
         if !language.isEmpty  { args += ["--language", language] }
         if let n = speakers   { args += ["--speakers", String(n)] }
         if polish             { args += ["--polish", "--polish-model", polishModel] }
+        if force              { args += ["--force"] }
 
         let p = Process()
         p.executableURL = URL(fileURLWithPath: uvPath)
@@ -116,6 +123,13 @@ final class TranscriptionRunner: ObservableObject {
         startTime = nil
     }
 
+    func reprocess() async {
+        guard let url = lastAudioURL, let a = lastArgs else { return }
+        await transcribe(audioURL: url, hfToken: a.hfToken, model: a.model,
+                         language: a.language, speakers: a.speakers,
+                         polish: a.polish, polishModel: a.polishModel, force: true)
+    }
+
     func reset() {
         process = nil
         state = .idle
@@ -158,6 +172,11 @@ final class TranscriptionRunner: ObservableObject {
                 if let lang = line.components(separatedBy: ":").last?.trimmingCharacters(in: .whitespaces) {
                     stepDetails[0] = "Language: \(lang)"
                 }
+            } else if line.contains("cached diarization") {
+                stepProgress[1] = 1.0
+                stepDetails[1] = "Loaded from cache"
+                currentStep = 2
+                state = .running(phase: "Merging results…")
             } else if line.contains("diarization") || line.contains("Diarization") {
                 currentStep = 1
                 state = .running(phase: "Identifying speakers…")

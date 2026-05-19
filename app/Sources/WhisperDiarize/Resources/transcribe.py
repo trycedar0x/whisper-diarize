@@ -101,6 +101,12 @@ def parse_args():
         help="Number of speakers (optional, auto-detected if not set)",
     )
     parser.add_argument(
+        "--force",
+        action="store_true",
+        default=False,
+        help="Ignore all caches and reprocess from scratch",
+    )
+    parser.add_argument(
         "--polish",
         action="store_true",
         default=False,
@@ -143,12 +149,51 @@ def transcribe_with_mlx(audio_path: str, model: str, language: str | None):
     return result
 
 
+def _rttm_path(audio_path: Path, num_speakers: int | None) -> Path:
+    """Cache path keyed on audio file + speaker count."""
+    spk_tag = f".spk{num_speakers}" if num_speakers else ".spkauto"
+    return audio_path.with_name(audio_path.stem + spk_tag + ".diarization.rttm")
+
+
+def _save_rttm(diarization, path: Path):
+    lines = []
+    for seg, _, spk in diarization.speaker_diarization.itertracks(yield_label=True):
+        lines.append(
+            f"SPEAKER audio 1 {seg.start:.3f} {seg.duration:.3f} <NA> <NA> {spk} <NA> <NA>"
+        )
+    path.write_text("\n".join(lines) + "\n")
+
+
+def _load_rttm(path: Path):
+    """Load a cached RTTM file and return a pyannote Annotation."""
+    from pyannote.core import Annotation, Segment
+
+    class _FakeDiarization:
+        def __init__(self, ann):
+            self.speaker_diarization = ann
+
+    ann = Annotation()
+    for line in path.read_text().splitlines():
+        parts = line.split()
+        if len(parts) < 8 or parts[0] != "SPEAKER":
+            continue
+        start, dur, spk = float(parts[3]), float(parts[4]), parts[7]
+        ann[Segment(start, start + dur)] = spk
+    return _FakeDiarization(ann)
+
+
 def diarize(audio_path: str, hf_token: str, num_speakers: int | None):
-    """Run pyannote diarization to identify speakers."""
+    """Run pyannote diarization to identify speakers (with RTTM cache)."""
     from pyannote.audio import Pipeline
     import torch
     global _APP_STEP
     _APP_STEP = 1
+
+    cache = _rttm_path(Path(audio_path), num_speakers)
+    if cache.exists():
+        print(f"💨 Loading cached diarization from {cache.name}")
+        print("APP_PROGRESS step=1 pct=100", flush=True)
+        return _load_rttm(cache)
 
     print("👥 Running speaker diarization (pyannote)...")
     device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
@@ -169,6 +214,9 @@ def diarize(audio_path: str, hf_token: str, num_speakers: int | None):
     diarization = pipeline(audio_path, **kwargs)
     print("APP_PROGRESS step=1 pct=100", flush=True)
     print("✅ Diarization done.")
+
+    _save_rttm(diarization, cache)
+    print(f"💾 Cached diarization to {cache.name}")
     return diarization
 
 
@@ -456,6 +504,12 @@ def main():
     # Step 1: Transcribe (cache is keyed on audio path + model to avoid stale hits)
     model_slug = args.model.replace("/", "_").replace("-", "_")
     cache_path = audio_path.with_name(audio_path.stem + f".{model_slug}.whisper.json")
+
+    if args.force:
+        for p in [cache_path, _rttm_path(audio_path, args.speakers)]:
+            if p.exists():
+                p.unlink()
+                print(f"🗑️  Cleared cache: {p.name}")
     if cache_path.exists():
         import json
         print(f"💨 Loading cached transcription from {cache_path}")
