@@ -1,0 +1,199 @@
+import Foundation
+import SwiftUI
+
+// MARK: - Models
+
+struct TranscriptLine: Identifiable {
+    let id = UUID()
+    let timestamp: String
+    let speaker: String
+    let text: String
+    let speakerIndex: Int
+}
+
+enum RunnerState: Equatable {
+    case idle
+    case running(phase: String)
+    case done
+    case failed(String)
+}
+
+// MARK: - Runner
+
+@MainActor
+final class TranscriptionRunner: ObservableObject {
+    @Published var state: RunnerState = .idle
+    @Published var logLines: [String] = []
+    @Published var transcript: [TranscriptLine] = []
+
+    private var process: Process?
+
+    // MARK: - Public API
+
+    func transcribe(audioURL: URL, hfToken: String, model: String, language: String, speakers: Int?) async {
+        state = .running(phase: "Preparing…")
+        logLines = []
+        transcript = []
+
+        guard let uvPath = findUV() else {
+            state = .failed("uv not found.\nInstall it from https://docs.astral.sh/uv/ and relaunch the app.")
+            return
+        }
+
+        guard let workDir = prepareWorkDir() else {
+            state = .failed("Could not set up working directory in Application Support.")
+            return
+        }
+
+        let scriptPath = workDir.appendingPathComponent("transcribe.py").path
+        let outputURL = workDir
+            .appendingPathComponent(audioURL.deletingPathExtension().lastPathComponent + "_transcript.txt")
+
+        var args: [String] = [
+            "run", "--project", workDir.path,
+            scriptPath,
+            audioURL.path,
+            "--output", outputURL.path,
+            "--model", model,
+        ]
+        if !hfToken.isEmpty   { args += ["--hf-token", hfToken] }
+        if !language.isEmpty  { args += ["--language", language] }
+        if let n = speakers   { args += ["--speakers", String(n)] }
+
+        let p = Process()
+        p.executableURL = URL(fileURLWithPath: uvPath)
+        p.arguments = args
+        p.currentDirectoryURL = workDir
+        p.environment = enrichedEnv()
+
+        let outPipe = Pipe()
+        let errPipe = Pipe()
+        p.standardOutput = outPipe
+        p.standardError = errPipe
+
+        for pipe in [outPipe, errPipe] {
+            pipe.fileHandleForReading.readabilityHandler = { [weak self] fh in
+                let data = fh.availableData
+                guard !data.isEmpty, let text = String(data: data, encoding: .utf8) else { return }
+                let lines = text.components(separatedBy: .newlines).filter { !$0.isEmpty }
+                Task { @MainActor [weak self] in self?.ingest(lines) }
+            }
+        }
+
+        self.process = p
+
+        await withCheckedContinuation { cont in
+            p.terminationHandler = { [weak self] proc in
+                Task { @MainActor [weak self] in
+                    outPipe.fileHandleForReading.readabilityHandler = nil
+                    errPipe.fileHandleForReading.readabilityHandler = nil
+                    if proc.terminationStatus == 0 {
+                        self?.loadTranscript(from: outputURL)
+                        self?.state = .done
+                    } else {
+                        self?.state = .failed("Process exited with code \(proc.terminationStatus).\nCheck the log above for details.")
+                    }
+                    cont.resume()
+                }
+            }
+            do {
+                try p.run()
+            } catch {
+                Task { @MainActor [weak self] in
+                    self?.state = .failed(error.localizedDescription)
+                    cont.resume()
+                }
+            }
+        }
+    }
+
+    func cancel() {
+        process?.terminate()
+        process = nil
+        state = .idle
+    }
+
+    func reset() {
+        process = nil
+        state = .idle
+        logLines = []
+        transcript = []
+    }
+
+    // MARK: - Log ingestion
+
+    private func ingest(_ lines: [String]) {
+        for line in lines {
+            logLines.append(line)
+            if line.contains("Transcribing")                      { state = .running(phase: "Transcribing audio…") }
+            else if line.contains("cached transcription")         { state = .running(phase: "Loaded cached transcription") }
+            else if line.contains("diarization") || line.contains("Diarization") { state = .running(phase: "Identifying speakers…") }
+            else if line.contains("Merging")                      { state = .running(phase: "Merging results…") }
+            else if line.contains("Saved to")                     { state = .running(phase: "Saving…") }
+        }
+    }
+
+    // MARK: - Transcript parsing
+
+    private func loadTranscript(from url: URL) {
+        guard let content = try? String(contentsOf: url, encoding: .utf8) else { return }
+        var speakerIndex: [String: Int] = [:]
+        var idx = 0
+        // Pattern: [00:01.20 → 00:05.44]  SPEAKER_00: Hello world
+        let pattern = #"^\[(.+?)\]\s+(\S+?):\s+(.+)$"#
+        guard let regex = try? NSRegularExpression(pattern: pattern) else { return }
+        transcript = content
+            .components(separatedBy: .newlines)
+            .filter { !$0.isEmpty }
+            .compactMap { line -> TranscriptLine? in
+                let range = NSRange(line.startIndex..., in: line)
+                guard let m = regex.firstMatch(in: line, range: range),
+                      let tsRange = Range(m.range(at: 1), in: line),
+                      let spRange = Range(m.range(at: 2), in: line),
+                      let txRange = Range(m.range(at: 3), in: line) else { return nil }
+                let speaker = String(line[spRange])
+                if speakerIndex[speaker] == nil { speakerIndex[speaker] = idx; idx += 1 }
+                return TranscriptLine(
+                    timestamp: String(line[tsRange]),
+                    speaker: speaker,
+                    text: String(line[txRange]),
+                    speakerIndex: speakerIndex[speaker]!
+                )
+            }
+    }
+
+    // MARK: - Setup helpers
+
+    private func prepareWorkDir() -> URL? {
+        guard let appSupport = FileManager.default
+            .urls(for: .applicationSupportDirectory, in: .userDomainMask).first else { return nil }
+        let dir = appSupport.appendingPathComponent("WhisperDiarize")
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+
+        // Copy bundled resources on first launch (or if missing)
+        for (name, ext) in [("transcribe", "py"), ("pyproject", "toml"), ("uv", "lock")] {
+            let dst = dir.appendingPathComponent("\(name).\(ext)")
+            guard !FileManager.default.fileExists(atPath: dst.path) else { continue }
+            if let src = Bundle.module.url(forResource: name, withExtension: ext) {
+                try? FileManager.default.copyItem(at: src, to: dst)
+            }
+        }
+        return dir
+    }
+
+    private func findUV() -> String? {
+        [
+            "/opt/homebrew/bin/uv",
+            "/usr/local/bin/uv",
+            "\(NSHomeDirectory())/.local/bin/uv",
+            "\(NSHomeDirectory())/.cargo/bin/uv",
+        ].first { FileManager.default.isExecutableFile(atPath: $0) }
+    }
+
+    private func enrichedEnv() -> [String: String] {
+        var env = ProcessInfo.processInfo.environment
+        let extra = "/opt/homebrew/bin:/usr/local/bin:\(NSHomeDirectory())/.local/bin:\(NSHomeDirectory())/.cargo/bin"
+        env["PATH"] = extra + ":" + (env["PATH"] ?? "/usr/bin:/bin")
+        return env
+    }
+}
