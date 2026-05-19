@@ -32,11 +32,7 @@ let package = Package(
             path: "Tests/MinutesTests"
         ),
 
-        // UI tests — run with: xcodebuild test (open Package.swift in Xcode first)
-        .testTarget(
-            name: "MinutesUITests",
-            dependencies: [],
-            path: "UITests/MinutesUITests"
-        ),
+        // UI tests — open app/Package.swift in Xcode and press ⌘U to run
+        // (excluded from swift test: requires a running app and Xcode scheme)
     ]
 )
