@@ -1,5 +1,5 @@
 import XCTest
-@testable import WhisperDiarizeCore
+@testable import MinutesCore
 
 final class TranscriptParserTests: XCTestCase {
 

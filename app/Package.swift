@@ -2,20 +2,20 @@
 import PackageDescription
 
 let package = Package(
-    name: "WhisperDiarize",
+    name: "Minutes",
     platforms: [.macOS(.v14)],
     targets: [
         // Core library — pure logic, no UI, fully testable
         .target(
-            name: "WhisperDiarizeCore",
-            path: "Sources/WhisperDiarizeCore"
+            name: "MinutesCore",
+            path: "Sources/MinutesCore"
         ),
 
         // Main app — UI layer, depends on Core
         .executableTarget(
-            name: "WhisperDiarize",
-            dependencies: ["WhisperDiarizeCore"],
-            path: "Sources/WhisperDiarize",
+            name: "Minutes",
+            dependencies: ["MinutesCore"],
+            path: "Sources/Minutes",
             resources: [
                 .copy("Resources/AppIcon.icns"),
                 .copy("Resources/AppIcon.png"),
@@ -27,16 +27,16 @@ let package = Package(
 
         // Unit tests — run with: swift test
         .testTarget(
-            name: "WhisperDiarizeTests",
-            dependencies: ["WhisperDiarizeCore"],
-            path: "Tests/WhisperDiarizeTests"
+            name: "MinutesTests",
+            dependencies: ["MinutesCore"],
+            path: "Tests/MinutesTests"
         ),
 
         // UI tests — run with: xcodebuild test (open Package.swift in Xcode first)
         .testTarget(
-            name: "WhisperDiarizeUITests",
+            name: "MinutesUITests",
             dependencies: [],
-            path: "UITests/WhisperDiarizeUITests"
+            path: "UITests/MinutesUITests"
         ),
     ]
 )

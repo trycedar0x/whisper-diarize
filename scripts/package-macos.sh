@@ -4,8 +4,10 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 APP_DIR="$ROOT_DIR/app"
 DIST_DIR="$ROOT_DIR/dist"
-APP_NAME="WhisperDiarize"
+APP_NAME="Minutes"
+APP_VERSION="${APP_VERSION:-0.1.0}"
 APP_BUNDLE="$DIST_DIR/$APP_NAME.app"
+DMG_PATH="$DIST_DIR/$APP_NAME-macos-arm64.dmg"
 ZIP_PATH="$DIST_DIR/$APP_NAME-macos-arm64.zip"
 CONFIGURATION="${CONFIGURATION:-release}"
 PYTHON_VERSION="${PYTHON_VERSION:-3.11}"
@@ -38,10 +40,12 @@ popd >/dev/null
 
 echo "==> Creating app bundle"
 cp "$BIN_DIR/$APP_NAME" "$APP_BUNDLE/Contents/MacOS/$APP_NAME"
-cp "$APP_DIR/Sources/WhisperDiarize/Info.plist" "$APP_BUNDLE/Contents/Info.plist"
-cp "$APP_DIR/Sources/WhisperDiarize/Resources/AppIcon.icns" "$APP_BUNDLE/Contents/Resources/AppIcon.icns"
+sed "s/__APP_VERSION__/$APP_VERSION/g" \
+  "$APP_DIR/Sources/Minutes/Info.plist" \
+  > "$APP_BUNDLE/Contents/Info.plist"
+cp "$APP_DIR/Sources/Minutes/Resources/AppIcon.icns" "$APP_BUNDLE/Contents/Resources/AppIcon.icns"
 
-RESOURCE_BUNDLE="$BIN_DIR/${APP_NAME}_WhisperDiarize.bundle"
+RESOURCE_BUNDLE="$BIN_DIR/${APP_NAME}_Minutes.bundle"
 if [[ ! -d "$RESOURCE_BUNDLE" ]]; then
   RESOURCE_BUNDLE="$BIN_DIR/${APP_NAME}_${APP_NAME}.bundle"
 fi
@@ -93,10 +97,22 @@ fi
 echo "==> Codesigning app bundle"
 codesign --force --deep --options runtime --sign "$CODESIGN_IDENTITY" "$APP_BUNDLE"
 
+echo "==> Creating DMG artifact"
+TEMP_DMG_DIR="$(mktemp -d)"
+cp -R "$APP_BUNDLE" "$TEMP_DMG_DIR/"
+ln -s /Applications "$TEMP_DMG_DIR/Applications"
+hdiutil create \
+  -volname "$APP_NAME $APP_VERSION" \
+  -srcfolder "$TEMP_DMG_DIR" \
+  -ov -format UDZO \
+  "$DMG_PATH"
+rm -rf "$TEMP_DMG_DIR"
+
 echo "==> Creating ZIP artifact"
 rm -f "$ZIP_PATH"
 ditto -c -k --keepParent "$APP_BUNDLE" "$ZIP_PATH"
 
 echo "Packaged:"
 echo "  $APP_BUNDLE"
+echo "  $DMG_PATH"
 echo "  $ZIP_PATH"

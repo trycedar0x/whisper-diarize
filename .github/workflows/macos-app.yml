@@ -39,8 +39,8 @@ jobs:
       - name: Upload packaged app artifact
         uses: actions/upload-artifact@v4
         with:
-          name: WhisperDiarize-macos-arm64
-          path: dist/WhisperDiarize-macos-arm64.zip
+          name: Minutes-macos-arm64
+          path: dist/Minutes-macos-arm64.zip
           if-no-files-found: error
 
       - name: Attach packaged app to GitHub release
@@ -50,5 +50,6 @@ jobs:
         run: |
           gh release upload \
             "${{ github.event.release.tag_name }}" \
-            dist/WhisperDiarize-macos-arm64.zip \
+            dist/Minutes-macos-arm64.dmg \
+            dist/Minutes-macos-arm64.zip \
             --clobber

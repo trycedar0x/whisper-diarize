@@ -1,8 +1,8 @@
 import Foundation
 import SwiftUI
-import WhisperDiarizeCore
+import MinutesCore
 
-// Models are now in WhisperDiarizeCore (TranscriptLine, RunnerState)
+// Models are now in MinutesCore (TranscriptLine, RunnerState)
 
 // MARK: - Runner
 
@@ -211,7 +211,7 @@ final class TranscriptionRunner: ObservableObject {
     private func prepareWorkDir() -> URL? {
         guard let appSupport = FileManager.default
             .urls(for: .applicationSupportDirectory, in: .userDomainMask).first else { return nil }
-        let dir = appSupport.appendingPathComponent("WhisperDiarize")
+        let dir = appSupport.appendingPathComponent("Minutes")
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
 
         // Copy bundled resources on first launch (or if missing)

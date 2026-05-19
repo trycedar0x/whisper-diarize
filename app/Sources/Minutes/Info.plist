@@ -3,15 +3,17 @@
 <plist version="1.0">
 <dict>
     <key>CFBundleIdentifier</key>
-    <string>com.whisper-diarize</string>
+    <string>com.trycedar0x.Minutes</string>
     <key>CFBundleName</key>
-    <string>WhisperDiarize</string>
+    <string>Minutes</string>
+    <key>CFBundleDisplayName</key>
+    <string>Minutes</string>
     <key>CFBundleVersion</key>
     <string>1</string>
     <key>CFBundleShortVersionString</key>
-    <string>0.1.0</string>
+    <string>__APP_VERSION__</string>
     <key>CFBundleExecutable</key>
-    <string>WhisperDiarize</string>
+    <string>Minutes</string>
     <key>CFBundleIconFile</key>
     <string>AppIcon</string>
     <key>CFBundlePackageType</key>

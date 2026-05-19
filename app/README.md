@@ -1,8 +1,8 @@
-# WhisperDiarize — macOS App
+# Minutes — macOS App
 
-Native macOS app for the whisper-diarize pipeline. Drag, drop, transcribe, and review speaker-labeled transcripts.
+Native macOS app for the minutes pipeline. Drag, drop, transcribe, and review speaker-labeled transcripts.
 
-<img width="860" alt="WhisperDiarize screenshot" src="../docs/app-screenshot.png">
+<img width="860" alt="Minutes screenshot" src="../docs/app-screenshot.png">
 
 ## Features
 
@@ -40,7 +40,7 @@ From the command line:
 ```bash
 cd app
 swift build
-.build/debug/WhisperDiarize
+.build/debug/Minutes
 ```
 
 Note: SwiftPM builds a raw executable, not a fully packaged `.app`. For Dock/Finder behavior, wrap the executable in an app bundle as described below.
@@ -54,7 +54,7 @@ Note: SwiftPM builds a raw executable, not a fully packaged `.app`. For Dock/Fin
    - https://huggingface.co/pyannote/speaker-diarization-community-1
 3. Drag an audio file onto the window
 
-The Python environment is set up automatically on first use (installs into `~/Library/Application Support/WhisperDiarize/`).
+The Python environment is set up automatically on first use (installs into `~/Library/Application Support/Minutes/`).
 
 Development builds fall back to `uv` when no bundled Python runtime is present. Packaged builds include a bundled Python runtime and locked Python dependencies.
 
@@ -69,8 +69,8 @@ make package
 This creates:
 
 ```text
-dist/WhisperDiarize.app
-dist/WhisperDiarize-macos-arm64.zip
+dist/Minutes.app
+dist/Minutes-macos-arm64.zip
 ```
 
 The packaged app includes:
@@ -94,7 +94,7 @@ Long term, prefer a dedicated Xcode macOS app target for cleaner archive/sign/no
 - manual workflow runs
 - published GitHub releases
 
-The workflow uploads `WhisperDiarize-macos-arm64.zip` as a GitHub Actions artifact. When a GitHub Release is published, the ZIP is attached to that release automatically.
+The workflow uploads `Minutes-macos-arm64.zip` as a GitHub Actions artifact. When a GitHub Release is published, the ZIP is attached to that release automatically.
 
 ## Architecture
 

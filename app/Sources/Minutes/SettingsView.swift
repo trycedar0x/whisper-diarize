@@ -161,7 +161,7 @@ private struct SettingsHeader: View {
                 AppLogo(size: 32, showShadow: true)
 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("WhisperDiarize")
+                    Text("Minutes")
                         .font(.headline)
                     Text("Default transcription settings")
                         .font(.caption)

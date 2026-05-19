@@ -166,7 +166,7 @@ struct AppLogo: View {
             .frame(width: size, height: size)
             .clipShape(RoundedRectangle(cornerRadius: size * 0.22, style: .continuous))
             .shadow(color: .black.opacity(showShadow ? 0.14 : 0), radius: 8, y: 3)
-            .accessibilityLabel("WhisperDiarize")
+            .accessibilityLabel("Minutes")
     }
 
     private var logoImage: Image {

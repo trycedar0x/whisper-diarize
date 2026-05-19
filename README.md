@@ -1,4 +1,4 @@
-# whisper-diarize
+# minutes
 
 **Who said what** — local, private speaker transcription for Apple Silicon.
 
@@ -37,7 +37,7 @@ Everything runs on your Mac:
 | Speaker detection | pyannote 3.1 | Metal (MPS) |
 | LLM cleanup | Qwen 2.5 7B | Apple Silicon GPU (MLX) |
 
-No audio, transcripts, or metadata are sent to any server. Ever. This makes WhisperDiarize suitable for interviews, legal recordings, medical notes, and any other sensitive audio.
+No audio, transcripts, or metadata are sent to any server. Ever. This makes Minutes suitable for interviews, legal recordings, medical notes, and any other sensitive audio.
 
 ## Requirements
 
@@ -77,7 +77,7 @@ swift build
 The app bundles `transcribe.py`, `pyproject.toml`, `uv.lock`, and app icon resources. On first use it copies the Python worker files into:
 
 ```text
-~/Library/Application Support/WhisperDiarize/
+~/Library/Application Support/Minutes/
 ```
 
 Development builds still fall back to `uv` if no bundled Python runtime is present. Packaged builds include a bundled Python runtime and the locked Python dependencies.
@@ -95,8 +95,8 @@ make package
 This creates:
 
 ```text
-dist/WhisperDiarize.app
-dist/WhisperDiarize-macos-arm64.zip
+dist/Minutes.app
+dist/Minutes-macos-arm64.zip
 ```
 
 The package script:
@@ -107,7 +107,7 @@ The package script:
 4. Creates a relocatable uv-managed Python 3.11 environment in `Contents/Resources/Python`
 5. Installs the locked Python dependencies into the app bundle
 6. Ad-hoc signs the app by default
-7. Creates `dist/WhisperDiarize-macos-arm64.zip`
+7. Creates `dist/Minutes-macos-arm64.zip`
 
 Long term, a dedicated Xcode macOS app target would make archive, signing, icons, and notarization cleaner than manually wrapping a SwiftPM executable.
 
@@ -118,7 +118,7 @@ Important: packaged builds bundle Python and Python dependencies, but Whisper, p
 GitHub Actions builds the packaged macOS app on pushes to `main`, manual workflow runs, and published GitHub releases:
 
 - workflow: `.github/workflows/macos-app.yml`
-- artifact: `WhisperDiarize-macos-arm64.zip`
+- artifact: `Minutes-macos-arm64.zip`
 - release asset: attached automatically when a GitHub Release is published
 
 Release builds are ad-hoc signed by default. Use a Developer ID certificate and notarization for broad distribution outside your own machines.
@@ -130,8 +130,8 @@ Release builds are ad-hoc signed by default. Use a Developer ID certificate and 
 **1. Clone and install dependencies**
 
 ```bash
-git clone https://github.com/trycedar0x/whisper-diarize.git
-cd whisper-diarize
+git clone https://github.com/trycedar0x/minutes.git
+cd minutes
 uv sync
 ```
 

@@ -1,7 +1,7 @@
 import SwiftUI
 
 @main
-struct WhisperDiarizeApp: App {
+struct MinutesApp: App {
     @StateObject private var runner = TranscriptionRunner()
 
     var body: some Scene {

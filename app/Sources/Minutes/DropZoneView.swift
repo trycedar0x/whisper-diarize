@@ -93,7 +93,7 @@ private struct HeaderBar: View {
     var body: some View {
         HStack(alignment: .firstTextBaseline) {
             VStack(alignment: .leading, spacing: AppDesign.Spacing.xs) {
-                Text("WhisperDiarize")
+                Text("Minutes")
                     .font(AppDesign.TypeScale.screenTitle)
                 Text("Transcribe audio and identify speakers locally.")
                     .font(AppDesign.TypeScale.headlineSupport)

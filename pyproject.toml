@@ -1,7 +1,7 @@
 [project]
-name = "whisper-diarize"
+name = "minutes"
 version = "0.1.0"
-description = "Fast audio transcription with speaker diarization — Apple Silicon optimized"
+description = "Who said what — local, private speaker transcription for Apple Silicon"
 requires-python = ">=3.11"
 dependencies = [
     "deepmultilingualpunctuation>=1.0.1",

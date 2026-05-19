@@ -1,5 +1,5 @@
 import SwiftUI
-import WhisperDiarizeCore
+import MinutesCore
 
 private let speakerPalette: [Color] = [
     AppDesign.Palette.accent, AppDesign.Palette.amber, AppDesign.Palette.rose, .blue, .teal, .indigo, .pink, .cyan
