@@ -94,11 +94,11 @@ PY
 fi
 
 echo "==> Codesigning app bundle"
-# Sign nested bundles first, then the app (--deep is unreliable for complex structures)
-for bundle in "$APP_BUNDLE/Contents/Resources/"*.bundle; do
-  [[ -d "$bundle" ]] && codesign --force --sign "$CODESIGN_IDENTITY" "$bundle"
-done
-codesign --force --options runtime --sign "$CODESIGN_IDENTITY" "$APP_BUNDLE"
+# Sign only the executable, then seal the app
+# (SwiftPM resource bundles are flat and not individually codesignable)
+codesign --force --options runtime --sign "$CODESIGN_IDENTITY" \
+  "$APP_BUNDLE/Contents/MacOS/$APP_NAME"
+codesign --force --sign "$CODESIGN_IDENTITY" "$APP_BUNDLE"
 
 echo "==> Creating DMG artifact"
 TEMP_DMG_DIR="$(mktemp -d)"
