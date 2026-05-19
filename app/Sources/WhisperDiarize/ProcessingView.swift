@@ -64,12 +64,25 @@ struct ProcessingView: View {
                         HStack {
                             Image(systemName: showLog ? "chevron.down" : "chevron.right")
                                 .font(.caption)
-                            Text("Show log")
+                            Text(showLog ? "Hide log" : "Show log")
                                 .font(.caption)
                             Spacer()
-                            Text("\(runner.logLines.count) lines")
-                                .font(.caption)
-                                .foregroundStyle(.tertiary)
+                            if showLog {
+                                Button {
+                                    NSPasteboard.general.clearContents()
+                                    NSPasteboard.general.setString(
+                                        runner.logLines.joined(separator: "\n"), forType: .string)
+                                } label: {
+                                    Label("Copy log", systemImage: "doc.on.doc")
+                                        .font(.caption)
+                                }
+                                .buttonStyle(.plain)
+                                .foregroundStyle(.secondary)
+                            } else {
+                                Text("\(runner.logLines.count) lines")
+                                    .font(.caption)
+                                    .foregroundStyle(.tertiary)
+                            }
                         }
                         .foregroundStyle(.secondary)
                         .padding(.horizontal, 24)
