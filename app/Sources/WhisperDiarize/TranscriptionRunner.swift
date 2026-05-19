@@ -13,6 +13,7 @@ final class TranscriptionRunner: ObservableObject {
     @Published var transcript: [TranscriptLine] = []
     @Published var currentStep: Int = 0          // 0=transcribe 1=diarize 2=merge 3=save
     @Published var stepDetails: [Int: String] = [:] // extra info per step (e.g. language)
+    @Published var stepProgress: [Int: Double] = [:] // 0.0–1.0 per step
     @Published var startTime: Date? = nil
 
     private var process: Process?
@@ -25,6 +26,7 @@ final class TranscriptionRunner: ObservableObject {
         transcript = []
         currentStep = 0
         stepDetails = [:]
+        stepProgress = [:]
         startTime = Date()
 
         guard let uvPath = findUV() else {
@@ -105,6 +107,7 @@ final class TranscriptionRunner: ObservableObject {
         state = .idle
         currentStep = 0
         stepDetails = [:]
+        stepProgress = [:]
         startTime = nil
     }
 
@@ -115,6 +118,7 @@ final class TranscriptionRunner: ObservableObject {
         transcript = []
         currentStep = 0
         stepDetails = [:]
+        stepProgress = [:]
         startTime = nil
     }
 
@@ -123,6 +127,12 @@ final class TranscriptionRunner: ObservableObject {
     private func ingest(_ lines: [String]) {
         for line in lines {
             logLines.append(line)
+
+            // Parse tqdm progress: "  45%|████  | 97294/216419 ..."
+            if let pct = parseTqdmPercent(line) {
+                stepProgress[currentStep] = pct
+            }
+
             if line.contains("Transcribing") {
                 currentStep = 0
                 state = .running(phase: "Transcribing audio…")
@@ -134,22 +144,36 @@ final class TranscriptionRunner: ObservableObject {
                 if let lang = line.components(separatedBy: ":").last?.trimmingCharacters(in: .whitespaces) {
                     stepDetails[0] = "Language: \(lang)"
                 }
+                stepProgress[0] = 1.0
                 currentStep = 1
                 state = .running(phase: "Identifying speakers…")
             } else if line.contains("diarization") || line.contains("Diarization") {
                 currentStep = 1
                 state = .running(phase: "Identifying speakers…")
             } else if line.contains("Diarization done") {
+                stepProgress[1] = 1.0
                 currentStep = 2
                 state = .running(phase: "Merging results…")
             } else if line.contains("Merging") {
+                stepProgress[1] = 1.0
                 currentStep = 2
                 state = .running(phase: "Merging results…")
             } else if line.contains("Saved to") {
+                stepProgress[2] = 1.0
+                stepProgress[3] = 1.0
                 currentStep = 3
                 state = .running(phase: "Saving…")
             }
         }
+    }
+
+    /// Parse tqdm percentage from lines like " 45%|████  | ..."
+    private func parseTqdmPercent(_ line: String) -> Double? {
+        guard let match = line.range(of: #"\b(\d{1,3})%\|"#, options: .regularExpression) else { return nil }
+        let token = line[match].dropLast(2) // remove "%|"
+            .trimmingCharacters(in: .whitespaces)
+        guard let pct = Double(token), pct >= 0, pct <= 100 else { return nil }
+        return pct / 100.0
     }
 
     // MARK: - Transcript parsing

@@ -48,7 +48,8 @@ struct ProcessingView: View {
                             step: step,
                             index: i,
                             currentStep: runner.currentStep,
-                            detail: runner.stepDetails[i]
+                            detail: runner.stepDetails[i],
+                            progress: runner.stepProgress[i]
                         )
                     }
                 }
@@ -121,6 +122,7 @@ private struct StepCard: View {
     let index: Int
     let currentStep: Int
     let detail: String?
+    let progress: Double?   // nil = indeterminate, 0.0–1.0 = known
 
     private var status: StepStatus {
         if index < currentStep { return .done }
@@ -129,60 +131,95 @@ private struct StepCard: View {
     }
 
     var body: some View {
-        HStack(spacing: 16) {
-            // Icon / status badge
-            ZStack {
-                Circle()
-                    .fill(status.bgColor)
-                    .frame(width: 44, height: 44)
+        VStack(spacing: 0) {
+            HStack(spacing: 16) {
+                // Icon / status badge
+                ZStack {
+                    Circle()
+                        .fill(status.bgColor)
+                        .frame(width: 44, height: 44)
 
-                if status == .active {
-                    ProgressView()
-                        .scaleEffect(0.7)
-                        .tint(.white)
-                } else if status == .done {
-                    Image(systemName: "checkmark")
-                        .font(.system(size: 15, weight: .bold))
-                        .foregroundStyle(.white)
-                } else {
-                    Image(systemName: step.icon)
-                        .font(.system(size: 16))
-                        .foregroundStyle(status.iconColor)
+                    if status == .active && progress == nil {
+                        ProgressView()
+                            .scaleEffect(0.7)
+                            .tint(.white)
+                    } else if status == .done {
+                        Image(systemName: "checkmark")
+                            .font(.system(size: 15, weight: .bold))
+                            .foregroundStyle(.white)
+                    } else {
+                        Image(systemName: step.icon)
+                            .font(.system(size: 16))
+                            .foregroundStyle(status.iconColor)
+                    }
+                }
+                .animation(.easeInOut, value: status)
+
+                // Text
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(step.title)
+                        .font(.body.weight(status == .active ? .semibold : .regular))
+                        .foregroundStyle(status == .pending ? .secondary : .primary)
+
+                    Text(detail ?? step.subtitle)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                Spacer()
+
+                // Status badge / percentage
+                Group {
+                    if status == .active {
+                        if let p = progress {
+                            Text("\(Int(p * 100))%")
+                                .font(.caption.weight(.semibold).monospacedDigit())
+                                .foregroundStyle(Color.accentColor)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 3)
+                                .background(Color.accentColor.opacity(0.12), in: Capsule())
+                        } else {
+                            Text("In progress")
+                                .font(.caption.weight(.medium))
+                                .foregroundStyle(Color.accentColor)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 3)
+                                .background(Color.accentColor.opacity(0.12), in: Capsule())
+                        }
+                    } else if status == .done {
+                        Text("Done")
+                            .font(.caption.weight(.medium))
+                            .foregroundStyle(.green)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 3)
+                            .background(Color.green.opacity(0.12), in: Capsule())
+                    }
                 }
             }
-            .animation(.easeInOut, value: status)
+            .padding(16)
 
-            // Text
-            VStack(alignment: .leading, spacing: 3) {
-                Text(step.title)
-                    .font(.body.weight(status == .active ? .semibold : .regular))
-                    .foregroundStyle(status == .pending ? .tertiary : .primary)
-
-                Text(detail ?? step.subtitle)
-                    .font(.caption)
-                    .foregroundStyle(status == .pending ? .quaternary : .secondary)
-            }
-
-            Spacer()
-
-            // Status label
-            if status == .active {
-                Text("In progress")
-                    .font(.caption.weight(.medium))
-                    .foregroundStyle(Color.accentColor)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 3)
-                    .background(Color.accentColor.opacity(0.12), in: Capsule())
-            } else if status == .done {
-                Text("Done")
-                    .font(.caption.weight(.medium))
-                    .foregroundStyle(.green)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 3)
-                    .background(Color.green.opacity(0.12), in: Capsule())
+            // Progress bar
+            if status == .active, let p = progress {
+                VStack(spacing: 4) {
+                    ProgressView(value: p)
+                        .tint(Color.accentColor)
+                    HStack {
+                        Text("\(Int(p * 100))% complete")
+                            .font(.system(size: 10))
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.bottom, 14)
+                .animation(.linear(duration: 0.3), value: p)
+            } else if status == .done, let p = progress, p >= 1 {
+                ProgressView(value: 1.0)
+                    .tint(.green)
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 14)
             }
         }
-        .padding(16)
         .background(.background, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 12, style: .continuous)
