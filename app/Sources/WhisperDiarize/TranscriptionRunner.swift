@@ -69,7 +69,10 @@ final class TranscriptionRunner: ObservableObject {
             pipe.fileHandleForReading.readabilityHandler = { [weak self] fh in
                 let data = fh.availableData
                 guard !data.isEmpty, let text = String(data: data, encoding: .utf8) else { return }
-                let lines = text.components(separatedBy: .newlines).filter { !$0.isEmpty }
+                let lines = text
+                    .components(separatedBy: CharacterSet(charactersIn: "\n\r"))
+                    .map { $0.trimmingCharacters(in: .whitespaces) }
+                    .filter { !$0.isEmpty }
                 Task { @MainActor [weak self] in self?.ingest(lines) }
             }
         }
@@ -215,6 +218,7 @@ final class TranscriptionRunner: ObservableObject {
         var env = ProcessInfo.processInfo.environment
         let extra = "/opt/homebrew/bin:/usr/local/bin:\(NSHomeDirectory())/.local/bin:\(NSHomeDirectory())/.cargo/bin"
         env["PATH"] = extra + ":" + (env["PATH"] ?? "/usr/bin:/bin")
+        env["PYTHONUNBUFFERED"] = "1"   // force unbuffered output so lines stream immediately
         return env
     }
 }
