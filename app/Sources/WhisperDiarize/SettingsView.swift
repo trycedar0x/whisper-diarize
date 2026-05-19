@@ -47,8 +47,6 @@ struct SettingsView: View {
                     }
                     Group {
                         Text("── Chinese-Optimised ──").disabled(true)
-                        Text("BELLE large-v3-zh — Mainland Chinese (推荐)")
-                            .tag("BRlin/Belle-whisper-large-v3-zh-mlx-bf16")
                         Text("Breeze-ASR-25 — Chinese-English code-switching")
                             .tag("Kenji8000/Breeze-ASR-25-mlx")
                     }

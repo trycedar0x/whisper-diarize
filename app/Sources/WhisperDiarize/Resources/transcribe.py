@@ -21,7 +21,26 @@ from pathlib import Path
 from dotenv import load_dotenv
 load_dotenv()  # loads .env from current directory
 
-# ── Structured progress for the macOS app ───────────────────────────────────
+# ── MLX-Whisper compatibility shim ─────────────────────────────────────────────────
+# Some fine-tuned models (e.g. BELLE) include extra fields in config.json
+# (e.g. activation_dropout) that mlx_whisper's ModelDimensions rejects.
+# Patch load_model to silently drop unknown fields.
+try:
+    import dataclasses
+    import mlx_whisper.load_models as _lm
+    import mlx_whisper.whisper as _mw
+
+    _valid_dim_fields = {f.name for f in dataclasses.fields(_mw.ModelDimensions)}
+    _orig_ModelDimensions = _mw.ModelDimensions
+
+    def _compat_ModelDimensions(**kwargs):
+        """Drop unknown fields before constructing ModelDimensions."""
+        return _orig_ModelDimensions(**{k: v for k, v in kwargs.items() if k in _valid_dim_fields})
+
+    _lm.whisper.ModelDimensions = _compat_ModelDimensions
+except Exception:
+    pass
+# ───────────────────────────────────────────────────────────────────────────
 # Monkey-patch tqdm so mlx-whisper + pyannote emit APP_PROGRESS lines.
 # Format: APP_PROGRESS step=<0-3> pct=<0-100>
 _APP_STEP = 0
