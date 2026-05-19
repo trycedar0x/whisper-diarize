@@ -92,9 +92,10 @@ def transcribe_with_mlx(audio_path: str, model: str, language: str | None):
 
     # initial_prompt nudges Whisper to output punctuation and avoid hallucination
     prompt = (
-        "以下是一段中文对话，请输出标准普通话，带标点符号。"
+        "以下是一段多人对话的转录，请包含标点符号（逗号、句号、问号等）。"
+        "Example: 大家好，我们今天来讨论一个非常重要的话题。你认为怎么样？我觉得很好！"
         if not language or language.startswith("zh")
-        else "Transcript of a multi-speaker conversation."
+        else "Transcript of a multi-speaker conversation with punctuation."
     )
 
     print(f"🎙️  Transcribing with mlx-whisper ({model})...")
@@ -103,8 +104,9 @@ def transcribe_with_mlx(audio_path: str, model: str, language: str | None):
         path_or_hf_repo=model,
         word_timestamps=True,
         language=language,
-        verbose=None,  # None = tqdm progress bars
+        verbose=None,
         initial_prompt=prompt,
+        condition_on_previous_text=False,  # apply initial_prompt to every 30s chunk
     )
     print(f"APP_PROGRESS step=0 pct=100", flush=True)
     print(f"✅ Transcription done. Detected language: {result.get('language', 'unknown')}")
