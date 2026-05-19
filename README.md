@@ -1,6 +1,16 @@
 # whisper-diarize
 
-Fast audio transcription with **speaker diarization**, optimized for Apple Silicon (M1/M2/M3/M4).
+**Who said what** — local, private speaker transcription for Apple Silicon.
+
+- 🔒 **Fully local** — transcription, diarization, and LLM polish all run on-device. No audio ever sent to a server.
+- 🖥️ **Native macOS app** — drag, drop, transcribe, search, copy, and save
+- 🎙️ **Transcription** via [`mlx-whisper`](https://github.com/ml-explore/mlx-examples/tree/main/whisper) — runs on Apple Silicon GPU via MLX
+- 👥 **Speaker diarization** via [`pyannote.audio`](https://github.com/pyannote/pyannote-audio) — who said what, automatically, runs on Metal (MPS)
+- ✨ **LLM polish** via [Qwen 2.5](https://huggingface.co/mlx-community/Qwen2.5-7B-Instruct-4bit) — local cleanup of punctuation and readability, no cloud API needed
+- ⚡ **Fast** — all models run natively on Apple Silicon, no GPU server needed
+- 💾 **Cached** — transcription is cached so retries are instant
+- 🌍 **Multilingual** — auto-detects language via Whisper
+- 🆓 **Free and open source** — MIT license
 
 - 🖥️ **Native macOS app** — drag, drop, transcribe, search, copy, and save
 - 🎙️ **Transcription** via [`mlx-whisper`](https://github.com/ml-explore/mlx-examples/tree/main/whisper) — runs on Apple Silicon GPU via MLX
@@ -16,6 +26,18 @@ Fast audio transcription with **speaker diarization**, optimized for Apple Silic
 ```
 
 ---
+
+## Privacy
+
+Everything runs on your Mac:
+
+| Step | Model | Runs on |
+|------|-------|---------|
+| Transcription | mlx-whisper (large-v3) | Apple Silicon GPU (MLX) |
+| Speaker detection | pyannote 3.1 | Metal (MPS) |
+| LLM cleanup | Qwen 2.5 7B | Apple Silicon GPU (MLX) |
+
+No audio, transcripts, or metadata are sent to any server. Ever. This makes WhisperDiarize suitable for interviews, legal recordings, medical notes, and any other sensitive audio.
 
 ## Requirements
 
@@ -108,7 +130,7 @@ Release builds are ad-hoc signed by default. Use a Developer ID certificate and 
 **1. Clone and install dependencies**
 
 ```bash
-git clone https://github.com/xiangkangjw/whisper-diarize.git
+git clone https://github.com/trycedar0x/whisper-diarize.git
 cd whisper-diarize
 uv sync
 ```
