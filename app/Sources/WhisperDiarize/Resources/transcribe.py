@@ -387,11 +387,11 @@ def polish_transcript(lines: list, llm_model: str, language: str | None) -> list
     is_chinese = not language or language.startswith("zh")
 
     system_prompt = (
-        "你是一个转录清理助手。用户会提供一段口语转录文本，请你：
-1. 添加合适的标点符号（逗号、句号、问号等）
-2. 保持口语自然，不要改变语气和语境
-3. 不要添加、删除或更改内容和词语
-4. 只返回清理后的文本，不要加任何解释或说明"""
+        "你是一个转录清理助手。用户会提供一段口语转录文本，请你："
+        "\n1. 添加合适的标点符号（逗号、句号、问号等）"
+        "\n2. 保持口语自然，不要改变语气和语境"
+        "\n3. 不要添加、删除或更改内容和词语"
+        "\n4. 只返回清理后的文本，不要加任何解释或说明"
         if is_chinese else
         "You are a transcript cleanup assistant. Add punctuation and fix obvious errors. "
         "Keep the natural spoken style. Return only the cleaned text, no explanations."
