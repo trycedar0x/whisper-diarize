@@ -1,0 +1,26 @@
+[
+  {
+    "case": "synth_zh_4spk",
+    "elapsed_s": 0.2,
+    "diarization": {
+      "DER": 15.78,
+      "missed": 1.78,
+      "false_alarm": 0.99,
+      "confusion": 13.02,
+      "coverage": 98.22
+    },
+    "transcription": {
+      "WER": 9.95,
+      "CER": 12.77,
+      "substitutions": 20,
+      "deletions": 0,
+      "insertions": 2,
+      "note": "WER = char-level for Chinese"
+    },
+    "segments": {
+      "count": 9,
+      "avg_dur_s": 5.27,
+      "short_pct": 0.0
+    }
+  }
+]

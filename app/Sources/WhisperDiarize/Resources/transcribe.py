@@ -120,9 +120,11 @@ def diarize(audio_path: str, hf_token: str, num_speakers: int | None):
     )
     pipeline.to(device)
 
+    # Use min/max speakers for a softer constraint (more accurate than hard num_speakers)
     kwargs = {}
     if num_speakers:
-        kwargs["num_speakers"] = num_speakers
+        kwargs["min_speakers"] = num_speakers
+        kwargs["max_speakers"] = num_speakers
 
     diarization = pipeline(audio_path, **kwargs)
     print("APP_PROGRESS step=1 pct=100", flush=True)
@@ -154,30 +156,30 @@ def merge_transcript_and_diarization(whisper_result, diarization):
             "speaker": speaker,
         })
 
-    def get_speaker_at(t):
-        """Find which speaker is talking at time t.
+    # Post-process: remove blips and merge close same-speaker segments
+    speaker_segments = _clean_speaker_segments(speaker_segments)
+
+    def get_speaker_at(t_start, t_end):
+        """Return speaker with most overlap over [t_start, t_end].
         Falls back to nearest segment so we never return UNKNOWN."""
-        # 1. Prefer a segment that contains t
         best_overlap, best_speaker = 0.0, None
         for seg in speaker_segments:
-            if seg["start"] <= t <= seg["end"]:
-                overlap = min(seg["end"], t) - max(seg["start"], t)
-                if overlap >= best_overlap:
-                    best_overlap = overlap
-                    best_speaker = seg["speaker"]
+            overlap = max(0.0, min(seg["end"], t_end) - max(seg["start"], t_start))
+            if overlap > best_overlap:
+                best_overlap = overlap
+                best_speaker = seg["speaker"]
         if best_speaker:
             return best_speaker
-        # 2. Fall back to nearest segment boundary (eliminates UNKNOWN)
         if not speaker_segments:
             return "UNKNOWN"
+        mid = (t_start + t_end) / 2
         nearest = min(speaker_segments,
-                      key=lambda s: min(abs(s["start"] - t), abs(s["end"] - t)))
+                      key=lambda s: min(abs(s["start"] - mid), abs(s["end"] - mid)))
         return nearest["speaker"]
 
-    # Assign each word a speaker
+    # Assign each word a speaker using full word duration
     for w in words:
-        mid = (w["start"] + w["end"]) / 2
-        w["speaker"] = get_speaker_at(mid)
+        w["speaker"] = get_speaker_at(w["start"], w["end"])
 
     # Group consecutive words by same speaker into lines
     lines = []
@@ -217,6 +219,29 @@ def merge_transcript_and_diarization(whisper_result, diarization):
 
 
 _MIN_DURATION = 0.8   # seconds — lines shorter than this get merged into the previous
+
+_SEG_MIN_DURATION = 0.3   # drop diarization blips shorter than this
+_SEG_MAX_GAP      = 0.5   # merge same-speaker segments with gaps smaller than this
+
+def _clean_speaker_segments(segments):
+    """Remove short blips and merge nearby same-speaker segments."""
+    if not segments:
+        return segments
+    segs = sorted(segments, key=lambda s: s["start"])
+    # Step 1: remove blips
+    segs = [s for s in segs if (s["end"] - s["start"]) >= _SEG_MIN_DURATION]
+    if not segs:
+        return segs
+    # Step 2: merge same-speaker with small gap
+    out = [dict(segs[0])]
+    for seg in segs[1:]:
+        prev = out[-1]
+        gap = seg["start"] - prev["end"]
+        if seg["speaker"] == prev["speaker"] and gap <= _SEG_MAX_GAP:
+            prev["end"] = seg["end"]
+        else:
+            out.append(dict(seg))
+    return out
 
 def _merge_short_fragments(lines):
     """Absorb very short lines (< 0.8s) into the preceding line."""
