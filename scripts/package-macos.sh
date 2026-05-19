@@ -56,7 +56,7 @@ if [[ ! -d "$RESOURCE_BUNDLE" ]]; then
 fi
 
 cp -R "$RESOURCE_BUNDLE" "$APP_BUNDLE/Contents/Resources/"
-cp -R "$RESOURCE_BUNDLE" "$APP_BUNDLE/"
+cp -R "$RESOURCE_BUNDLE" "$APP_BUNDLE/Contents/MacOS/"
 
 if [[ "$BUNDLE_PYTHON" == "1" ]]; then
   PYTHON_ENV="$APP_BUNDLE/Contents/Resources/Python"
