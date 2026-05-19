@@ -9,7 +9,7 @@ struct DropZoneView: View {
     @AppStorage("language")  private var language = ""
     @AppStorage("speakers")  private var speakersRaw = 0   // 0 = auto
     @AppStorage("polish")    private var polish = false
-    @AppStorage("polishModel") private var polishModel = "mlx-community/Qwen2.5-1.5B-Instruct-4bit"
+    @AppStorage("polishModel") private var polishModel = "mlx-community/Qwen2.5-7B-Instruct-4bit"
 
     @State private var isTargeted = false
     @State private var showFilePicker = false

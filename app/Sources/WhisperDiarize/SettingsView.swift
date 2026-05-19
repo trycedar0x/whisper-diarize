@@ -6,7 +6,7 @@ struct SettingsView: View {
     @AppStorage("language")  private var language = ""
     @AppStorage("speakers")  private var speakersRaw = 0
     @AppStorage("polish")    private var polish = false
-    @AppStorage("polishModel") private var polishModel = "mlx-community/Qwen2.5-1.5B-Instruct-4bit"
+    @AppStorage("polishModel") private var polishModel = "mlx-community/Qwen2.5-7B-Instruct-4bit"
 
     var body: some View {
         Form {
@@ -90,8 +90,8 @@ struct SettingsView: View {
                 }
                 if polish {
                     Picker("LLM Model", selection: $polishModel) {
-                        Text("Qwen2.5-1.5B (fast, ~1GB)").tag("mlx-community/Qwen2.5-1.5B-Instruct-4bit")
-                        Text("Qwen2.5-3B (better, ~2GB)").tag("mlx-community/Qwen2.5-3B-Instruct-4bit")
+                        Text("Qwen2.5-1.5B (fast, ~1GB, weak)").tag("mlx-community/Qwen2.5-7B-Instruct-4bit")
+                        Text("Qwen2.5-3B (faster, ~2GB)").tag("mlx-community/Qwen2.5-7B-Instruct-4bit")
                         Text("Qwen2.5-7B (best, ~4GB)").tag("mlx-community/Qwen2.5-7B-Instruct-4bit")
                     }
                     LabeledContent("") {

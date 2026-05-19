@@ -114,8 +114,8 @@ def parse_args():
     )
     parser.add_argument(
         "--polish-model",
-        default="mlx-community/Qwen2.5-1.5B-Instruct-4bit",
-        help="MLX LLM model for polishing (default: Qwen2.5-1.5B-Instruct-4bit)",
+        default="mlx-community/Qwen2.5-7B-Instruct-4bit",
+        help="MLX LLM model for polishing (default: Qwen2.5-7B-Instruct-4bit)",
     )
     return parser.parse_args()
 
@@ -424,54 +424,116 @@ def format_transcript(lines: list) -> str:
 
 def polish_transcript(lines: list, llm_model: str, language: str | None) -> list:
     """
-    Use a local LLM to tidy up each speaker turn:
-    - Add punctuation
-    - Fix obvious transcription errors
-    - Remove excessive filler words
-    Preserves timestamps and speaker labels exactly.
+    Use a local LLM in 15-line chunks to:
+    - Correct transcription errors using surrounding context
+    - Merge fragmented same-speaker consecutive lines
+    - Fix punctuation
+    Preserves the [ts → ts]  SPEAKER_XX: text format.
     """
+    import re as _re2
     from mlx_lm import load, generate
 
     is_chinese = not language or language.startswith("zh")
+    CHUNK = 15   # lines per batch
+    OVERLAP = 3  # context lines carried over between chunks
 
     system_prompt = (
-        "你是一个转录清理助手。用户会提供一段口语转录文本，请你："
-        "\n1. 添加合适的标点符号（逗号、句号、问号等）"
-        "\n2. 保持口语自然，不要改变语气和语境"
-        "\n3. 不要添加、删除或更改内容和词语"
-        "\n4. 只返回清理后的文本，不要加任何解释或说明"
+        "You are a transcript cleanup assistant for Chinese speech."
+        " The user gives you transcript lines in EXACTLY this format:\n"
+        "  [MM:SS.ss → MM:SS.ss]  SPEAKER_XX: text\n\n"
+        "Rules:\n"
+        "1. ALWAYS keep the full format including [timestamp → timestamp]  SPEAKER_XX: prefix\n"
+        "2. Fix transcription errors using context (例:『北北理工』→『北理工』, 『没有没有』→『没有』, 『牟封』→『牌』)\n"
+        "3. Merge consecutive lines from the SAME SPEAKER if they form one thought\n"
+        "   (use first line's start time, last line's end time)\n"
+        "4. Add/fix Chinese punctuation\n"
+        "5. Return ONLY the lines, no explanations, no markdown"
         if is_chinese else
-        "You are a transcript cleanup assistant. Add punctuation and fix obvious errors. "
-        "Keep the natural spoken style. Return only the cleaned text, no explanations."
+        "You are a transcript cleanup assistant."
+        " Keep the EXACT format: [ts → ts]  SPEAKER_XX: text."
+        " Fix errors using context, add punctuation, merge fragmented same-speaker lines."
+        " Return only lines, no explanations."
     )
+
+    def _fmt(chunk):
+        out = []
+        for l in chunk:
+            ts = f"[{format_time(l['start'])} → {format_time(l['end'])}]"
+            out.append(f"{ts}  {l['speaker']}: {l['text']}")
+        return "\n".join(out)
+
+    _LINE_RE = _re2.compile(
+        r'\[(\d+:\d+\.\d+)\s*→\s*(\d+:\d+\.\d+)\]\s+(\S+?):\s+(.+)'
+    )
+
+    def _parse_time(s):
+        m, rest = s.split(":")
+        return int(m) * 60 + float(rest)
+
+    def _parse(text, fallback_chunk):
+        """Parse LLM output back to line dicts; fall back to originals on failure."""
+        result = []
+        orig_speakers = [l['speaker'] for l in fallback_chunk]
+        for i, raw in enumerate(text.splitlines()):
+            raw = raw.strip()
+            if not raw:
+                continue
+            m = _LINE_RE.match(raw)
+            if m:
+                result.append({
+                    'start':   _parse_time(m.group(1)),
+                    'end':     _parse_time(m.group(2)),
+                    'speaker': m.group(3),
+                    'text':    m.group(4).strip(),
+                })
+            else:
+                # LLM dropped SPEAKER label — try to recover with a simpler pattern
+                m2 = _re2.match(r'\[(\d+:\d+\.\d+)\s*→\s*(\d+:\d+\.\d+)\]\s+(.+)', raw)
+                if m2:
+                    spk = orig_speakers[len(result)] if len(result) < len(orig_speakers) else 'SPEAKER_00'
+                    result.append({
+                        'start':   _parse_time(m2.group(1)),
+                        'end':     _parse_time(m2.group(2)),
+                        'speaker': spk,
+                        'text':    m2.group(3).strip(),
+                    })
+        return result if result else fallback_chunk
 
     print(f"🤖 Loading LLM ({llm_model})...")
     model, tokenizer = load(llm_model)
-    print("✅ LLM loaded. Polishing transcript...")
+    print("✅ LLM loaded. Polishing transcript in chunks...")
 
-    total = len(lines)
     polished = []
+    i = 0
+    total_chunks = max(1, len(lines) // CHUNK + 1)
+    chunk_num = 0
 
-    for i, line in enumerate(lines):
-        pct = int(100 * i / total)
-        if i % 5 == 0:
-            print(f"APP_PROGRESS step=4 pct={pct}", flush=True)
+    while i < len(lines):
+        chunk = lines[i : i + CHUNK]
+        chunk_num += 1
+        pct = int(100 * i / len(lines))
+        print(f"APP_PROGRESS step=4 pct={pct}", flush=True)
+        print(f"   Chunk {chunk_num}/{total_chunks} (lines {i+1}-{i+len(chunk)})...", flush=True)
 
         messages = [
             {"role": "system", "content": system_prompt},
-            {"role": "user",   "content": line["text"]},
+            {"role": "user",   "content": _fmt(chunk)},
         ]
         prompt = tokenizer.apply_chat_template(
             messages, add_generation_prompt=True, tokenize=False
         )
-        cleaned = generate(
+        raw = generate(
             model, tokenizer,
             prompt=prompt,
-            max_tokens=len(line["text"]) * 2 + 50,
+            max_tokens=sum(len(l["text"]) for l in chunk) * 3 + 200,
             verbose=False,
         ).strip()
 
-        polished.append({**line, "text": cleaned or line["text"]})
+        cleaned = _parse(raw, chunk)
+        # Only append non-overlap lines (last OVERLAP lines carry over as context)
+        keep = cleaned[:-OVERLAP] if len(cleaned) > OVERLAP and i + CHUNK < len(lines) else cleaned
+        polished.extend(keep)
+        i += CHUNK
 
     print("APP_PROGRESS step=4 pct=100", flush=True)
     print("✅ Polishing done.")

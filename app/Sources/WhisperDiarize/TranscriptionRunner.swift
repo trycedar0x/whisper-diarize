@@ -24,7 +24,7 @@ final class TranscriptionRunner: ObservableObject {
     // MARK: - Public API
 
     func transcribe(audioURL: URL, hfToken: String, model: String, language: String, speakers: Int?,
-                    polish: Bool = false, polishModel: String = "mlx-community/Qwen2.5-1.5B-Instruct-4bit",
+                    polish: Bool = false, polishModel: String = "mlx-community/Qwen2.5-7B-Instruct-4bit",
                     force: Bool = false) async {
         state = .running(phase: "Preparing…")
         logLines = []
