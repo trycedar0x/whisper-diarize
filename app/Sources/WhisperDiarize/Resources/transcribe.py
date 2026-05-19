@@ -424,6 +424,29 @@ def format_transcript(lines: list) -> str:
     return "\n".join(output)
 
 
+def _generate_context_summary(lines: list, model, tokenizer, is_chinese: bool) -> str:
+    """Generate a 2-3 sentence summary of the conversation for use as context."""
+    from mlx_lm import generate
+    sample = "\n".join(
+        f"[{l['speaker']}]: {l['text']}"
+        for l in lines[:30]
+    )
+    if is_chinese:
+        sys = (
+            "请用中文用2-3句话概括这段对话的：场景和主题、参与者与導角、涉及的专业词汇或固有名词（如学校名、专业名、人名）。"
+            "这将用于辅助后续的转录校对。只返回概括内容。"
+        )
+    else:
+        sys = (
+            "Summarize this conversation in 2-3 sentences: setting/topic, participant roles, "
+            "and key domain terms or proper nouns (school names, programs, people). "
+            "This will assist transcript correction. Return only the summary."
+        )
+    msgs = [{"role": "system", "content": sys}, {"role": "user", "content": sample}]
+    prompt = tokenizer.apply_chat_template(msgs, add_generation_prompt=True, tokenize=False)
+    return generate(model, tokenizer, prompt=prompt, max_tokens=200, verbose=False).strip()
+
+
 def polish_transcript(lines: list, llm_model: str, language: str | None) -> list:
     """
     Use a local LLM in 15-line chunks to:
@@ -507,8 +530,31 @@ def polish_transcript(lines: list, llm_model: str, language: str | None) -> list
 
     print(f"🤖 Loading LLM ({llm_model})...")
     model, tokenizer = load(llm_model)
-    print("✅ LLM loaded. Polishing transcript in chunks...")
+    print("✅ LLM loaded.")
 
+    # Step 1: generate conversation context summary
+    print("📝 Generating conversation context...")
+    context = _generate_context_summary(lines, model, tokenizer, is_chinese)
+    print(f"   Context: {context[:120]}..." if len(context) > 120 else f"   Context: {context}")
+
+    # Inject context into system prompt
+    context_note = (
+        f"\n\n对话背景：{context}"
+        if is_chinese else
+        f"\n\nConversation context: {context}"
+    )
+    full_system = system_prompt + context_note
+
+    # Step 2: process chunks with light chain-of-thought
+    cot_note = (
+        "\n\n将每行输出前，先在<think>标签内简要分析需要修正的地方，然后输出修正后的所有行。格式：\n<think>分析...</think>\n[corrected lines]"
+        if is_chinese else
+        "\n\nBefore outputting, briefly analyze errors in <think> tags, then output all corrected lines.\n"
+        "Format:\n<think>analysis...</think>\n[corrected lines]"
+    )
+    full_system_cot = full_system + cot_note
+
+    print("✨ Polishing transcript in chunks...")
     polished = []
     i = 0
     total_chunks = max(1, len(lines) // CHUNK + 1)
@@ -522,7 +568,7 @@ def polish_transcript(lines: list, llm_model: str, language: str | None) -> list
         print(f"   Chunk {chunk_num}/{total_chunks} (lines {i+1}-{i+len(chunk)})...", flush=True)
 
         messages = [
-            {"role": "system", "content": system_prompt},
+            {"role": "system", "content": full_system_cot},
             {"role": "user",   "content": _fmt(chunk)},
         ]
         prompt = tokenizer.apply_chat_template(
@@ -531,9 +577,12 @@ def polish_transcript(lines: list, llm_model: str, language: str | None) -> list
         raw = generate(
             model, tokenizer,
             prompt=prompt,
-            max_tokens=sum(len(l["text"]) for l in chunk) * 3 + 200,
+            max_tokens=sum(len(l["text"]) for l in chunk) * 4 + 300,
             verbose=False,
         ).strip()
+
+        # Strip CoT thinking block
+        raw = _re2.sub(r'<think>.*?</think>', '', raw, flags=_re2.DOTALL).strip()
 
         cleaned = _parse(raw, chunk)
         # Only append non-overlap lines (last OVERLAP lines carry over as context)
