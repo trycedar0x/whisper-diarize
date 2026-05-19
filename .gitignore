@@ -1,0 +1,32 @@
+# Environment
+.env
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# uv
+.python-version
+
+# Whisper transcription cache
+*.whisper.json
+
+# Output transcripts
+*_transcript.txt
+
+# Audio files (keep your own files out of the repo)
+*.wav
+*.mp3
+*.m4a
+*.mp4
+*.aac
+*.flac
+*.ogg
+*.wma
+
+# macOS
+.DS_Store
